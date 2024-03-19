@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-key-secret
+type: Opaque
+data:
+  API_KEY: NDRiMTllNjYtODM4My00M2NiLTk1Y2YtYTU3ZWMzOGU2ZDAw
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-service-account
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-app-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: sample-app
+  template:
+    metadata:
+      labels:
+        app: sample-app
+    spec:
+      containers:
+      - name: sample-app
+        image: registry.gitlab.com/shahidhamza/sample-app:1.0.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-key-secret
+              key: API_KEY
+      serviceAccountName: app-service-account
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sample-app-service
+spec:
+  type: NodePort
+  selector:
+    app: sample-app
+  ports:
+  - port: 3000
+    targetPort: 3000
+    nodePort: 30000
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: sample-app-deployment
+  namespace: default
+spec:
+  maxReplicas: 4
+  metrics:
+  - resource:
+      name: cpu
+      target:
+        averageUtilization: 90
+        type: Utilization
+    type: Resource
+  minReplicas: 2
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: sample-app-deployment
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: sample-app-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: sample-app

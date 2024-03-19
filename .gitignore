@@ -1,0 +1,3 @@
+.terraform*
+Modules/compute/EC2/PKI/*
+backend.tf
